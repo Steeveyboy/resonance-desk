@@ -36,21 +36,33 @@ class BaseAgent(ABC):
     def system_prompt(self) -> str:
         """Return the system-level persona prompt for this agent."""
 
-    def analyze(self, headline: str) -> AgentResponse:
+    def analyze(self, headline: str, context: str = "") -> AgentResponse:
         """Analyze *headline* and return a structured :class:`AgentResponse`.
 
         Args:
             headline: The breaking news headline to evaluate.
+            context: Optional prior analysis from earlier agents in the debate,
+                     shown to this agent before it responds.
 
         Returns:
             An :class:`AgentResponse` with the agent's viewpoint.
         """
         from utils.llm import call_llm
 
-        user_message = (
-            f"Breaking headline: {headline}\n\n"
-            "Provide your analysis and market stance in 3-5 sentences."
-        )
+        if context:
+            user_message = (
+                f"Breaking headline: {headline}\n\n"
+                "--- Specialist Analysis ---\n"
+                f"{context}\n"
+                "--- End Specialist Analysis ---\n\n"
+                "Given the specialist assessments above, provide your market "
+                "stance in 3-5 sentences."
+            )
+        else:
+            user_message = (
+                f"Breaking headline: {headline}\n\n"
+                "Provide your analysis and market stance in 3-5 sentences."
+            )
         raw = call_llm(
             system_prompt=self.system_prompt,
             user_message=user_message,

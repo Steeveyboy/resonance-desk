@@ -17,14 +17,17 @@ load_dotenv()
 
 _MOCK_RESPONSES: dict[str, str] = {
     "bull_trader": (
-        "Despite the headline, underlying fundamentals remain strong. "
-        "Tech stocks have historically recovered quickly from cybersecurity scares. "
+        "The specialists raise valid concerns, but I've seen this pattern before. "
+        "Despite the cyber and geopolitical risk flags, underlying fundamentals remain strong. "
+        "Tech stocks have historically recovered quickly from these scares. "
         "I recommend a cautious BUY on dips — volatility is a buying opportunity."
     ),
     "bear_trader": (
-        "This headline signals systemic risk. Supply chain disruptions and regulatory "
-        "backlash are likely. I'm positioning SHORT on exposed sectors. "
-        "Expect 15-20% downside pressure over the next two weeks."
+        "The specialist assessments confirm my thesis: this headline signals systemic risk. "
+        "The cyber analyst's CRITICAL severity rating and the geopolitical knock-ons the "
+        "geopolitical analyst described make a SHORT position compelling. "
+        "Supply chain disruptions and regulatory backlash are likely — "
+        "expect 15-20% downside pressure over the next two weeks."
     ),
     "cyber_analyst": (
         "Threat actor fingerprints suggest a nation-state APT campaign. "
@@ -74,7 +77,7 @@ def call_llm(
         The assistant reply text.
     """
     api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key or api_key.startswith("sk-..."):
+    if not api_key or api_key == "sk-...":
         return _mock_response(agent_name, user_message)
 
     try:

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from simulation.orchestrator import DebateOrchestrator
+from simulation.orchestrator import DebateOrchestrator, DebateResult
 from simulation.synthesizer import Synthesizer
 
 # ---------------------------------------------------------------------------
@@ -133,7 +133,6 @@ if run_button:
     progress.empty()
 
     # Rebuild DebateResult for synthesizer
-    from simulation.orchestrator import DebateResult
     debate_result = DebateResult(headline=headline)
     debate_result.responses = responses_collected[:-1]  # all except risk manager
     debate_result.final_verdict = responses_collected[-1]

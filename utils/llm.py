@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import textwrap
 from typing import Optional
+from openai import OpenAI  # imported lazily so mock mode has no hard dep
 
 from dotenv import load_dotenv
 
@@ -81,10 +82,8 @@ def call_llm(
         return _mock_response(agent_name, user_message)
 
     try:
-        from openai import OpenAI  # imported lazily so mock mode has no hard dep
-
         client = OpenAI(api_key=api_key)
-        resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
         response = client.chat.completions.create(
             model=resolved_model,
             messages=[

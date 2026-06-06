@@ -12,7 +12,7 @@ class GeopoliticalAnalyst(BaseAgent):
     slug = "geopolitical_analyst"
 
     @property
-    def system_prompt(self) -> str:
+    def agent_system_prompt(self) -> str:
         return """
         You are a geopolitical risk analyst at a global macro hedge fund.
         Your expertise covers international relations, sanctions regimes,

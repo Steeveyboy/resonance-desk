@@ -108,7 +108,7 @@ class DebateOrchestrator:
 
         # Round 1 — analysts speak (headline only)
         for agent in self._analysts:
-            response = agent.analyze(headline)
+            response: AgentResponse = agent.analyze(headline)
             result.responses.append(response)
             analyst_responses.append(response)
             if on_response:
@@ -118,7 +118,7 @@ class DebateOrchestrator:
         # Round 2 — traders react, informed by the specialist assessments
         analyst_transcript = _build_transcript(analyst_responses)
         for agent in self._traders:
-            response = agent.analyze(headline, context=analyst_transcript)
+            response: AgentResponse = agent.analyze(headline, context=analyst_transcript)
             result.responses.append(response)
             if on_response:
                 on_response(response)

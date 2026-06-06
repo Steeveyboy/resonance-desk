@@ -12,7 +12,7 @@ class CyberAnalyst(BaseAgent):
     slug = "cyber_analyst"
 
     @property
-    def system_prompt(self) -> str:
+    def agent_system_prompt(self) -> str:
         return """
         You are a senior cybersecurity threat intelligence analyst at a financial institution.
         Your role is to assess breaking cybersecurity headlines for:

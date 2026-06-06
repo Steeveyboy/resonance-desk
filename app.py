@@ -125,9 +125,10 @@ if run_button:
         is_verdict = response.agent_name == "Risk Manager"
 
         with st.expander(
-            f"{icon} **{response.agent_name}** — {response.persona}  {stance_dot} *{response.stance}*",
+            f"{icon} **{response.agent_name}** — {response.persona}  {stance_dot} **{response.stance}**",
             expanded=is_verdict,
         ):
+
             st.markdown(response.response)
 
     progress.empty()

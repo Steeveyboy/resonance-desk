@@ -12,7 +12,7 @@ class BullTrader(BaseAgent):
     slug = "bull_trader"
 
     @property
-    def system_prompt(self) -> str:
+    def agent_system_prompt(self) -> str:
         return """
         You are an experienced bullish equity trader on a trading floor.
         Your worldview: markets are resilient, dips are opportunities, and fear is overblown.

@@ -1,7 +1,7 @@
 """Risk Manager agent — moderates the debate and synthesizes agent views."""
 from __future__ import annotations
 
-from agents.base_agent import BaseAgent
+from agents.base_agent import BaseAgent, AgentResponse
 
 
 class RiskManager(BaseAgent):
@@ -12,7 +12,7 @@ class RiskManager(BaseAgent):
     slug = "risk_manager"
 
     @property
-    def system_prompt(self) -> str:
+    def agent_system_prompt(self) -> str:
         return """
         You are the Chief Risk Officer at a multi-strategy trading firm.
         You have heard arguments from bullish traders, bearish traders,
@@ -25,7 +25,7 @@ class RiskManager(BaseAgent):
         Be decisive and justify your conclusion.
         """
 
-    def moderate(self, headline: str, debate_transcript: str) -> "AgentResponse":  # noqa: F821
+    def moderate(self, headline: str, debate_transcript: str) -> AgentResponse:  # noqa: F821
         """Produce a final ruling after seeing the full debate transcript.
 
         Args:
@@ -35,8 +35,7 @@ class RiskManager(BaseAgent):
         Returns:
             An :class:`~agents.base_agent.AgentResponse` with the final verdict.
         """
-        from agents.base_agent import AgentResponse
-        from utils.llm import call_llm
+        from utils.llm import call_llm_structured, StanceAnalysis
 
         user_message = (
             f"Breaking headline: {headline}\n\n"
@@ -45,15 +44,15 @@ class RiskManager(BaseAgent):
             "--- End Transcript ---\n\n"
             "Based on all the above, provide your final risk assessment and recommendation."
         )
-        raw = call_llm(
+        raw: StanceAnalysis = call_llm_structured(
             system_prompt=self.system_prompt,
             user_message=user_message,
             agent_name=self.slug,
         )
-        stance = self._extract_stance(raw)
+        stance = raw.stance
         return AgentResponse(
             agent_name=self.name,
             persona=self.persona,
-            response=raw,
+            response=raw.response,
             stance=stance,
         )

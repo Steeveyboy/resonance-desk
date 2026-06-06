@@ -12,7 +12,7 @@ class BearTrader(BaseAgent):
     slug = "bear_trader"
 
     @property
-    def system_prompt(self) -> str:
+    def agent_system_prompt(self) -> str:
         return """
         You are an experienced bearish macro trader.
         Your worldview: systemic risks are under-appreciated, markets are complacent,

@@ -116,7 +116,7 @@ def call_llm(
 
     try:
         client = OpenAI(api_key=api_key)
-        resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+        resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         response = client.chat.completions.create(
             model=resolved_model,
             messages=[
@@ -175,8 +175,8 @@ def call_llm_structured(
         import instructor
 
         client = instructor.from_openai(OpenAI(api_key=api_key))
-        resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
-        
+        resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
         res = client.chat.completions.create(
             model=resolved_model,
             response_model=StanceAnalysis,

@@ -35,8 +35,6 @@ class RiskManager(BaseAgent):
         Returns:
             An :class:`~agents.base_agent.AgentResponse` with the final verdict.
         """
-        from utils.llm import call_llm_structured, StanceAnalysis
-
         user_message = (
             f"Breaking headline: {headline}\n\n"
             "--- Debate Transcript ---\n"
@@ -44,15 +42,4 @@ class RiskManager(BaseAgent):
             "--- End Transcript ---\n\n"
             "Based on all the above, provide your final risk assessment and recommendation."
         )
-        raw: StanceAnalysis = call_llm_structured(
-            system_prompt=self.system_prompt,
-            user_message=user_message,
-            agent_name=self.slug,
-        )
-        stance = raw.stance
-        return AgentResponse(
-            agent_name=self.name,
-            persona=self.persona,
-            response=raw.response,
-            stance=stance,
-        )
+        return self._respond(user_message)

@@ -7,10 +7,13 @@ Parses the debate result to produce:
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 
 from simulation.orchestrator import DebateResult
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -64,6 +67,12 @@ class Synthesizer:
         recommendation = self._majority_vote(stance_breakdown, debate)
         volatility_score = self._extract_volatility(debate)
         rationale = self._build_rationale(debate, recommendation, volatility_score)
+        logger.info(
+            "Synthesis: recommendation=%s volatility=%d stances=%s",
+            recommendation,
+            volatility_score,
+            stance_breakdown,
+        )
 
         return SynthesisResult(
             volatility_score=volatility_score,
@@ -109,7 +118,12 @@ class Synthesizer:
         if match:
             raw = match.group(1) or match.group(2)
             value = int(raw)
+            logger.debug("Volatility score parsed from text: %d", value)
             return min(max(value, 0), 100)
+
+        logger.warning(
+            "No volatility score found in verdict text; using stance heuristic"
+        )
 
         # Heuristic fallback based on stance distribution
         bearish = sum(

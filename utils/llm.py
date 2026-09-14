@@ -5,10 +5,16 @@ LangChain's ``ChatOpenAI`` client.
 When ``LLM_API_KEY`` is not set the client falls back to *mock* mode,
 returning deterministic placeholder responses so the app can be explored
 without a live API key.
+
+Failures in :func:`call_llm_structured` raise :class:`LLMError` so the debate
+can stop early instead of paying for more calls; agents catch it and turn it
+into an error response, so it never reaches the UI as a traceback.
 """
 from __future__ import annotations
 
+import logging
 import textwrap
+import time
 from enum import Enum
 from typing import Optional
 
@@ -16,6 +22,12 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
 from utils.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class LLMError(RuntimeError):
+    """Raised when a structured LLM call fails or returns unusable output."""
 
 _MOCK_RESPONSES: dict[str, str] = {
     "bull_trader": (
@@ -106,7 +118,7 @@ def call_llm(
     agent_name: str = "agent",
     model: Optional[str] = None,
     temperature: float = 0.7,
-    max_tokens: int = 512,
+    max_tokens: int = 2048,
 ) -> str:
     """Call the LLM and return the assistant reply as a string.
 
@@ -125,6 +137,7 @@ def call_llm(
     """
     api_key = settings.llm_api_key or ""
     if not api_key:
+        logger.info("[%s] mock mode — no LLM_API_KEY set", agent_name)
         return _mock_response(agent_name, user_message)
 
     try:
@@ -137,6 +150,7 @@ def call_llm(
         )
         return response.content or ""
     except Exception as exc:  # noqa: BLE001
+        logger.exception("[%s] LLM call failed", agent_name)
         return f"[LLM error: {exc}]"
 
 
@@ -146,7 +160,7 @@ def call_llm_structured(
     agent_name: str = "agent",
     model: Optional[str] = None,
     temperature: float = 0.7,
-    max_tokens: int = 512,
+    max_tokens: int = 2048,
 ) -> StanceAnalysis:
     """Call the LLM and return a structured :class:`StanceAnalysis`.
 
@@ -164,21 +178,67 @@ def call_llm_structured(
 
     Returns:
         A :class:`StanceAnalysis` with the agent's response text and validated stance.
+
+    Raises:
+        LLMError: If the request fails or the response cannot be parsed.
     """
     api_key = settings.llm_api_key or ""
     if not api_key:
+        logger.info("[%s] mock mode — no LLM_API_KEY set", agent_name)
         raw = _mock_response(agent_name, user_message)
         return StanceAnalysis(response=raw, stance=_extract_stance_from_text(raw))
 
+    model_name = model or settings.llm_model
+    logger.info(
+        "[%s] calling %s via %s (max_tokens=%d, prompt=%d chars)",
+        agent_name,
+        model_name,
+        settings.llm_base_url or "default endpoint",
+        max_tokens,
+        len(system_prompt) + len(user_message),
+    )
+    logger.debug("[%s] user message:\n%s", agent_name, user_message)
+
+    started = time.perf_counter()
     try:
         llm = _build_chat_model(model, temperature, max_tokens)
-        structured_llm = llm.with_structured_output(StanceAnalysis)
-        return structured_llm.invoke(
+        # include_raw keeps the underlying message, so usage and finish reason
+        # can be logged, and parse failures come back instead of being raised.
+        structured_llm = llm.with_structured_output(StanceAnalysis, include_raw=True)
+        output = structured_llm.invoke(
             [
                 ("system", textwrap.dedent(system_prompt)),
                 ("human", user_message),
             ]
         )
     except Exception as exc:  # noqa: BLE001
-        raw = f"[LLM error: {exc}]"
-        return StanceAnalysis(response=raw, stance=StanceEnum.NEUTRAL)
+        elapsed = time.perf_counter() - started
+        logger.error(
+            "[%s] request failed after %.1fs: %s", agent_name, elapsed, exc
+        )
+        raise LLMError(str(exc)) from exc
+
+    elapsed = time.perf_counter() - started
+    raw_message = output.get("raw")
+    metadata = getattr(raw_message, "response_metadata", None) or {}
+    logger.info(
+        "[%s] finished in %.1fs (finish_reason=%s, usage=%s)",
+        agent_name,
+        elapsed,
+        metadata.get("finish_reason"),
+        getattr(raw_message, "usage_metadata", None),
+    )
+
+    parsed = output.get("parsed")
+    if output.get("parsing_error") is not None or parsed is None:
+        error = output.get("parsing_error") or "model returned no structured output"
+        logger.error(
+            "[%s] could not parse structured output: %s\nraw content: %r",
+            agent_name,
+            error,
+            getattr(raw_message, "content", None),
+        )
+        raise LLMError(f"Could not parse structured output: {error}")
+
+    logger.info("[%s] stance=%s", agent_name, parsed.stance)
+    return parsed

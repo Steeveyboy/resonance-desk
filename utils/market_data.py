@@ -15,6 +15,8 @@ All queries are read-only, parameterised, and bounded.
 """
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional
@@ -25,6 +27,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from utils.config import settings
+
+# Log messages here must never include the connection URL: it holds credentials.
+logger = logging.getLogger(__name__)
 
 #: Placeholder shipped in ``.env.example``; treated the same as "not set".
 _PLACEHOLDER_URL = "postgresql://user:password@localhost:5432/corporate_db"
@@ -120,6 +125,7 @@ def get_engine() -> Optional[Engine]:
     """
     url = (settings.database_url or "").strip()
     if not url or url == _PLACEHOLDER_URL:
+        logger.info("DATABASE_URL not set; market data disabled")
         return None
     try:
         return create_engine(
@@ -136,7 +142,9 @@ def get_engine() -> Optional[Engine]:
                 )
             },
         )
-    except Exception:  # noqa: BLE001 — never surface a URL-bearing traceback
+    except Exception as exc:  # noqa: BLE001 — never surface a URL-bearing traceback
+        # Only the type: URL parse errors echo the URL, password included.
+        logger.error("Could not create database engine (%s)", type(exc).__name__)
         return None
 
 
@@ -157,7 +165,12 @@ def database_status() -> tuple[bool, str]:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return True, "Connected to the market warehouse."
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Database unreachable: %s: %s",
+            type(exc).__name__,
+            getattr(exc, "orig", None) or type(exc).__name__,
+        )
         return False, (
             "Could not reach the market database. Check that PostgreSQL is "
             "running and that `DATABASE_URL` is correct."
@@ -173,11 +186,29 @@ def _query(sql: str, params: dict) -> pd.DataFrame:
     engine = get_engine()
     if engine is None:
         return pd.DataFrame()
+    query_name = " ".join(sql.split())[:60]
+    started = time.perf_counter()
     try:
         with engine.connect() as conn:
-            return pd.read_sql_query(text(sql), conn, params=params)
-    except Exception:  # noqa: BLE001
+            df = pd.read_sql_query(text(sql), conn, params=params)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Query failed after %.2fs (%s) params=%s: %s: %s",
+            time.perf_counter() - started,
+            query_name,
+            params,
+            type(exc).__name__,
+            getattr(exc, "orig", None) or type(exc).__name__,
+        )
         return pd.DataFrame()
+    logger.info(
+        "Query returned %d rows in %.2fs (%s) params=%s",
+        len(df),
+        time.perf_counter() - started,
+        query_name,
+        params,
+    )
+    return df
 
 
 # ---------------------------------------------------------------------------

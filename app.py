@@ -5,10 +5,16 @@ Run with:
 """
 from __future__ import annotations
 
+import logging
+
 import streamlit as st
 
 from simulation.orchestrator import DebateOrchestrator, DebateResult
 from simulation.synthesizer import Synthesizer
+from utils.logging_config import setup_logging
+
+setup_logging()
+logger = logging.getLogger("resonance.app")
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -88,6 +94,8 @@ if run_button:
         st.warning("Please enter a headline before running the simulation.")
         st.stop()
 
+    logger.info("Simulation requested from UI")
+
     st.divider()
     st.subheader("🤖 Agent Debate")
 
@@ -126,12 +134,26 @@ if run_button:
 
         with st.expander(
             f"{icon} **{response.agent_name}** — {response.persona}  {stance_dot} **{response.stance}**",
-            expanded=is_verdict,
+            expanded=is_verdict or response.failed,
         ):
-
-            st.markdown(response.response)
+            if response.failed:
+                st.error(response.response)
+            else:
+                st.markdown(response.response)
 
     progress.empty()
+
+    # The orchestrator stops at the first failed agent — nothing to synthesize.
+    failed = next((r for r in responses_collected if r.failed), None)
+    if failed is not None:
+        skipped = total_agents - len(responses_collected)
+        st.error(
+            f"**Simulation stopped:** {failed.agent_name} failed, so the "
+            f"remaining {skipped} agent(s) were not called to save tokens. "
+            "Check the logs for details.",
+            icon="🛑",
+        )
+        st.stop()
 
     # Rebuild DebateResult for synthesizer
     debate_result = DebateResult(headline=headline)

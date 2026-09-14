@@ -4,10 +4,14 @@ All market-participant agents inherit from :class:`BaseAgent`.
 """
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Optional
 
-from utils.llm import StanceEnum, StanceAnalysis, call_llm_structured
+from utils.llm import LLMError, StanceEnum, call_llm_structured
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -18,6 +22,13 @@ class AgentResponse:
     persona: str
     response: str
     stance: StanceEnum = StanceEnum.NEUTRAL  # e.g. "BUY", "SELL", "SHORT", "HOLD"
+    #: Set when the LLM call failed; ``response`` then holds a displayable message.
+    error: Optional[str] = None
+
+    @property
+    def failed(self) -> bool:
+        """Return whether this agent failed to produce an analysis."""
+        return self.error is not None
 
 
 class BaseAgent(ABC):
@@ -72,18 +83,36 @@ class BaseAgent(ABC):
                 f"{context}\n"
                 "--- End Specialist Analysis ---\n\n"
                 "Given the specialist assessments above, provide your market "
-                "stance in 3-5 sentences."
+                "stance in 1-3 sentences."
             )
         else:
             user_message = (
                 f"Breaking headline: {headline}\n\n"
-                "Provide your analysis and market stance in 3-5 sentences."
+                "Provide your analysis and market stance in 1-3 sentences."
             )
-        result: StanceAnalysis = call_llm_structured(
-            system_prompt=self.system_prompt,
-            user_message=user_message,
-            agent_name=self.slug,
-        )
+        return self._respond(user_message)
+
+    def _respond(self, user_message: str) -> AgentResponse:
+        """Send *user_message* to the LLM and wrap the result.
+
+        LLM failures come back as an :class:`AgentResponse` with ``error`` set,
+        never as an exception, so callers can decide whether to carry on.
+        """
+        logger.info("%s is analysing", self.name)
+        try:
+            result = call_llm_structured(
+                system_prompt=self.system_prompt,
+                user_message=user_message,
+                agent_name=self.slug,
+            )
+        except LLMError as exc:
+            logger.warning("%s failed: %s", self.name, exc)
+            return AgentResponse(
+                agent_name=self.name,
+                persona=self.persona,
+                response=f"[LLM error: {exc}]",
+                error=str(exc),
+            )
         return AgentResponse(
             agent_name=self.name,
             persona=self.persona,

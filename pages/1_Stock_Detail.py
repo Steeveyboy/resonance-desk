@@ -13,6 +13,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from utils.logging_config import setup_logging
 from utils.market_data import (
     DEMO_TICKERS,
     SentimentSnapshot,
@@ -34,6 +35,8 @@ st.set_page_config(
     page_icon="📈",
     layout="wide",
 )
+
+setup_logging()
 
 #: Diverging red → grey → green ramp used for every sentiment encoding.
 _SENTIMENT_SCALE = alt.Scale(

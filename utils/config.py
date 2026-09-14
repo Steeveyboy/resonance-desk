@@ -15,5 +15,20 @@ class Settings(BaseSettings):
 
     database_url: Optional[str] = None
 
+    log_level: str = "INFO"
+    log_file: Optional[str] = None
+
 
 settings = Settings()
+
+
+def reload_settings() -> Settings:
+    """Re-read ``.env`` and return a fresh :class:`Settings` object.
+
+    Also replaces the module-level ``settings``, so code that reads
+    ``config.settings`` picks up the new values. Modules that did
+    ``from utils.config import settings`` keep their old object.
+    """
+    global settings
+    settings = Settings()
+    return settings

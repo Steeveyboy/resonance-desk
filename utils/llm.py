@@ -1,22 +1,21 @@
 """LLM client wrapper.
 
-Provides a thin wrapper around the OpenAI chat-completions API.
-When ``OPENAI_API_KEY`` is not set the client falls back to *mock* mode,
+Provides a thin wrapper around an OpenAI-compatible LLM provider via
+LangChain's ``ChatOpenAI`` client.
+When ``LLM_API_KEY`` is not set the client falls back to *mock* mode,
 returning deterministic placeholder responses so the app can be explored
 without a live API key.
 """
 from __future__ import annotations
 
-import os
 import textwrap
 from enum import Enum
 from typing import Optional
 
-from dotenv import load_dotenv
-from openai import OpenAI
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
-load_dotenv()
+from utils.config import settings
 
 _MOCK_RESPONSES: dict[str, str] = {
     "bull_trader": (
@@ -86,6 +85,21 @@ def _extract_stance_from_text(text: str) -> StanceEnum:
     return StanceEnum.NEUTRAL
 
 
+def _build_chat_model(
+    model: Optional[str],
+    temperature: float,
+    max_tokens: int,
+) -> ChatOpenAI:
+    """Build a LangChain ``ChatOpenAI`` client for the configured provider."""
+    return ChatOpenAI(
+        model=model or settings.llm_model or "",
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+
 def call_llm(
     system_prompt: str,
     user_message: str,
@@ -96,37 +110,32 @@ def call_llm(
 ) -> str:
     """Call the LLM and return the assistant reply as a string.
 
-    Falls back to a mock response when ``OPENAI_API_KEY`` is absent.
+    Falls back to a mock response when ``LLM_API_KEY`` is absent.
 
     Args:
         system_prompt: Role/persona instructions for the agent.
         user_message: The headline or prompt passed to the agent.
         agent_name: Key used to look up a mock response (matches agent slugs).
-        model: OpenAI model identifier; defaults to the ``OPENAI_MODEL`` env var
-               or ``gpt-4o-mini``.
+        model: Provider model identifier; defaults to the ``LLM_MODEL`` env var.
         temperature: Sampling temperature.
         max_tokens: Maximum tokens in the completion.
 
     Returns:
         The assistant reply text.
     """
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key or api_key == "sk-...":
+    api_key = settings.llm_api_key or ""
+    if not api_key:
         return _mock_response(agent_name, user_message)
 
     try:
-        client = OpenAI(api_key=api_key)
-        resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        response = client.chat.completions.create(
-            model=resolved_model,
-            messages=[
-                {"role": "system", "content": textwrap.dedent(system_prompt)},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=temperature,
-            max_tokens=max_tokens,
+        llm = _build_chat_model(model, temperature, max_tokens)
+        response = llm.invoke(
+            [
+                ("system", textwrap.dedent(system_prompt)),
+                ("human", user_message),
+            ]
         )
-        return response.choices[0].message.content or ""
+        return response.content or ""
     except Exception as exc:  # noqa: BLE001
         return f"[LLM error: {exc}]"
 
@@ -141,54 +150,35 @@ def call_llm_structured(
 ) -> StanceAnalysis:
     """Call the LLM and return a structured :class:`StanceAnalysis`.
 
-    Uses ``instructor`` to enforce the response schema. Falls back to a mock
-    response (with heuristic stance extraction) when ``OPENAI_API_KEY`` is absent.
+    Uses LangChain's structured-output support to enforce the response
+    schema. Falls back to a mock response (with heuristic stance extraction)
+    when ``LLM_API_KEY`` is absent.
 
     Args:
         system_prompt: Role/persona instructions for the agent.
         user_message: The headline or prompt passed to the agent.
         agent_name: Key used to look up a mock response (matches agent slugs).
-        model: OpenAI model identifier; defaults to the ``OPENAI_MODEL`` env var
-               or ``gpt-4o-mini``.
+        model: Provider model identifier; defaults to the ``LLM_MODEL`` env var.
         temperature: Sampling temperature.
         max_tokens: Maximum tokens in the completion.
 
     Returns:
         A :class:`StanceAnalysis` with the agent's response text and validated stance.
     """
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key or api_key == "sk-...":
+    api_key = settings.llm_api_key or ""
+    if not api_key:
         raw = _mock_response(agent_name, user_message)
-        
         return StanceAnalysis(response=raw, stance=_extract_stance_from_text(raw))
 
     try:
-        # res = call_llm(
-        #     system_prompt=system_prompt,
-        #     user_message=user_message,
-        #     agent_name=agent_name,
-        #     model=model,
-        #     temperature=temperature,
-        #     max_tokens=max_tokens,
-        # )
-        # return StanceAnalysis(response=res, stance=_extract_stance_from_text(res))
-        import instructor
-
-        client = instructor.from_openai(OpenAI(api_key=api_key))
-        resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
-        res = client.chat.completions.create(
-            model=resolved_model,
-            response_model=StanceAnalysis,
-            messages=[
-                {"role": "system", "content": textwrap.dedent(system_prompt)},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=temperature,
-            max_tokens=max_tokens,
+        llm = _build_chat_model(model, temperature, max_tokens)
+        structured_llm = llm.with_structured_output(StanceAnalysis)
+        return structured_llm.invoke(
+            [
+                ("system", textwrap.dedent(system_prompt)),
+                ("human", user_message),
+            ]
         )
-           
-        return res
     except Exception as exc:  # noqa: BLE001
         raw = f"[LLM error: {exc}]"
         return StanceAnalysis(response=raw, stance=StanceEnum.NEUTRAL)

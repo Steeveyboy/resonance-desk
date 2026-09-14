@@ -14,7 +14,7 @@ Cyber incidents and geopolitical shocks rarely move markets in a straight line. 
 
 The app supports:
 
-- ⚡ **Live mode** with OpenAI-backed responses
+- ⚡ **Live mode** with responses from any OpenAI-compatible LLM provider
 - 🧪 **Mock mode** with deterministic placeholder outputs when no API key is set
 
 ## Tech stack 🧰
@@ -22,7 +22,7 @@ The app supports:
 | Layer | Tools |
 | --- | --- |
 | UI | Streamlit |
-| LLM integration | OpenAI Python SDK, Instructor |
+| LLM integration | LangChain (ChatOpenAI, provider-agnostic) |
 | Data validation | Pydantic |
 | Config | python-dotenv |
 | Language | Python |
@@ -54,11 +54,12 @@ pip install -r requirements.txt
 Create a `.env` file in the repo root.
 
 ```env
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-5.4-mini
+LLM_API_KEY=your_api_key
+LLM_BASE_URL=https://api.your-provider.example/v1
+LLM_MODEL=your-chosen-model
 ```
 
-`OPENAI_API_KEY` is optional. If it is missing, the app starts in **mock mode**, which is useful for UI development, demos, and local exploration.
+`LLM_API_KEY` is optional. If it is missing, the app starts in **mock mode**, which is useful for UI development, demos, and local exploration.
 
 ### 5. Run the app ▶️
 

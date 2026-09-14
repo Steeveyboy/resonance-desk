@@ -15,18 +15,16 @@ All queries are read-only, parameterised, and bounded.
 """
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
 import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-load_dotenv()
+from utils.config import settings
 
 #: Placeholder shipped in ``.env.example``; treated the same as "not set".
 _PLACEHOLDER_URL = "postgresql://user:password@localhost:5432/corporate_db"
@@ -120,7 +118,7 @@ def get_engine() -> Optional[Engine]:
     ``None`` is returned when ``DATABASE_URL`` is absent or still holds the
     ``.env.example`` placeholder, which lets the app run without a warehouse.
     """
-    url = os.getenv("DATABASE_URL", "").strip()
+    url = (settings.database_url or "").strip()
     if not url or url == _PLACEHOLDER_URL:
         return None
     try:

@@ -35,7 +35,7 @@ st.divider()
 with st.sidebar:
     st.header("⚙️ Configuration")
     st.info(
-        "Set **OPENAI_API_KEY** in a `.env` file to use live AI responses. "
+        "Set **LLM_API_KEY** in a `.env` file to use live AI responses. "
         "Without a key the app runs in **mock mode** with placeholder answers.",
         icon="ℹ️",
     )
